@@ -8,6 +8,12 @@
     },
     {
       "path": "./apps/auth-service"
+    },
+    {
+      "path": "./apps/gateway-api-e2e"
+    },
+    {
+      "path": "./apps/gateway-api"
     }
   ]
 }

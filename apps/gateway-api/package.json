@@ -1,0 +1,29 @@
+{
+  "name": "@x-shop/gateway-api",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "targets": {
+      "serve": {
+        "continuous": true,
+        "executor": "@nx/js:node",
+        "defaultConfiguration": "development",
+        "dependsOn": [
+          "build"
+        ],
+        "options": {
+          "buildTarget": "@x-shop/gateway-api:build",
+          "runBuildTargetDependencies": false
+        },
+        "configurations": {
+          "development": {
+            "buildTarget": "@x-shop/gateway-api:build:development"
+          },
+          "production": {
+            "buildTarget": "@x-shop/gateway-api:build:production"
+          }
+        }
+      }
+    }
+  }
+}
