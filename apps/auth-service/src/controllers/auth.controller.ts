@@ -5,12 +5,15 @@ import { ValidationError } from '../../../../packages/error-handler';
 import prisma from '../../../../packages/libs/prisma';
 import {
   checkOtpRestriction,
+  handleForgotPassword,
   trackOtpRequest,
   validationRegistrationData,
+  verifyForgotPasswordOtp,
 } from '../utils/auth.helper';
 import { setCookie } from '../utils/cookies/setCookie';
 import { sendOtp, verifyOtp } from './../utils/auth.helper';
 
+// Register user
 export const userRegistration = async (
   req: Request,
   res: Response,
@@ -42,6 +45,7 @@ export const userRegistration = async (
   }
 };
 
+// Verify user
 export const verifyUser = async (
   req: Request,
   res: Response,
@@ -84,6 +88,7 @@ export const verifyUser = async (
   }
 };
 
+// Login user
 export const loginUser = async (
   req: Request,
   res: Response,
@@ -139,3 +144,68 @@ export const loginUser = async (
     next(error);
   }
 };
+
+// Forgot password
+export const userForgotPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  await handleForgotPassword(req, res, next, 'user');
+};
+
+// Verify forgot password Otp
+export const verifyUserForgotPasswordOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  await verifyForgotPasswordOtp(req, res, next);
+};
+
+// Reset password
+export const resetUserPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email, newPassword } = req.body;
+    const user = await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+    if (!user) {
+      return next(new ValidationError(`User not found`));
+    }
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      user.password || ''
+    );
+    if (isSamePassword) {
+      return next(
+        new ValidationError(
+          `New password should be different from old password.`
+        )
+      );
+    }
+    const hashPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: {
+        email,
+      },
+      data: {
+        password: hashPassword,
+      },
+    });
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
