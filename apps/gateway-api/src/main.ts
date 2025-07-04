@@ -34,7 +34,7 @@ app.use(
   })
 );
 
-app.use('/', proxy('http://localhost:6000'));
+app.use('/', proxy('http://localhost:6001'));
 
 app.get('/gateway-health', (req, res) => {
   res.send({ message: 'Welcome to api-gateway!' });

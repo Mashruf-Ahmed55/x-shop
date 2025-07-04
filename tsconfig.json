@@ -14,6 +14,9 @@
     },
     {
       "path": "./apps/gateway-api"
+    },
+    {
+      "path": "./apps/user-ui"
     }
   ]
 }
