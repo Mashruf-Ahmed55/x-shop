@@ -1,25 +1,26 @@
 'use client';
 
-import { FacebookButton, GoogleButton } from '@/components/social-buttons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
-} from '@/components/ui/input-otp';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
 import { useMutation } from '@tanstack/react-query';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
+import {
+  ArrowLeft,
+  Eye,
+  EyeClosed,
+  Lock,
+  Mail,
+  ShoppingBag,
+  User,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiLoader } from 'react-icons/fi';
-import { RiEye2Line, RiEyeCloseLine } from 'react-icons/ri';
+import { FaSpinner } from 'react-icons/fa';
+import { toast } from 'sonner';
 
 type FormData = {
   name: string;
@@ -29,11 +30,9 @@ type FormData = {
 
 export default function RegisterPage() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [canResend, setCanResend] = useState(false);
   const [otp, setOtp] = useState<string | null>(null);
-  const [isShowOtp, setIsShowOtp] = useState(false);
-  const [timer, setTimer] = useState(60);
   const [userData, setUserData] = useState<FormData | null>(null);
+  const [step, setStep] = useState<'register' | 'verify'>('register');
   const router = useRouter();
 
   const {
@@ -42,101 +41,85 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<FormData>();
 
-  const startResendTimer = () => {
-    setCanResend(false);
-    setTimer(60);
-    const interval = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setCanResend(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
   const signUpMutation = useMutation({
     mutationKey: ['signUp'],
     mutationFn: async (data: FormData) => {
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/registration-user`,
-        data
-      );
+      const response = await axios.post(`/api/registration-user`, data);
       return response.data;
     },
     onSuccess: (_, formdata) => {
       setUserData(formdata);
-      setIsShowOtp(true);
-      startResendTimer();
+      setStep('verify');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Registration failed');
     },
   });
 
   const verifyOtpMutation = useMutation({
     mutationKey: ['verifyOtp'],
     mutationFn: async () => {
-      if (!userData) return;
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/verify-user`,
-        {
-          ...userData,
-          otp: otp,
-        }
-      );
+      if (!userData || !otp) throw new Error('Missing data');
+      const response = await axios.post(`/api/verify-user`, {
+        ...userData,
+        otp,
+      });
       return response.data;
     },
     onSuccess: () => {
+      toast.success('User registered successfully!');
       router.push('/login');
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'OTP verification failed');
+    },
   });
+
+  const resendOtp = () => {
+    if (userData) {
+      signUpMutation.mutate(userData);
+    }
+  };
 
   const onSubmit = (data: FormData) => {
     signUpMutation.mutate(data);
   };
 
-  const resendOtp = () => {
-    if (userData) {
-      signUpMutation.mutate(userData);
-      startResendTimer();
-    }
-  };
+  if (step === 'verify') {
+    return (
+      <OtpVerification
+        email={userData?.email ?? ''}
+        onBack={() => setStep('register')}
+        onSubmit={() => verifyOtpMutation.mutate()}
+        onResendOtp={resendOtp}
+        onVerifyOtp={(otpValue) => setOtp(otpValue)}
+      />
+    );
+  }
 
   return (
-    <div className="w-full py-10 min-h-[84dvh] bg-[#f1f1f1]">
-      <h1 className="text-4xl font-montserrat font-semibold text-black text-center">
-        Register
-      </h1>
-      <p className="text-center text-lg font-medium py-3 text-[#00000099]">
-        Home · Register
-      </p>
-      <div className="w-full flex justify-center">
-        <div className="md:w-[480px] p-8 bg-white shadow rounded-lg">
-          <h3 className="text-3xl font-semibold text-center mb-2">
-            Register to x-shop
-          </h3>
-          <p className="text-center text-gray-500 mb-4">
-            Already have an account?{' '}
-            <Link href="/login" className="text-lime-600">
-              Log in
-            </Link>
+    <div className="min-h-[84vh] flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <div className="flex justify-center items-center mb-6">
+            <ShoppingBag className="h-12 w-12 text-blue-600" />
+            <h1 className="ml-3 text-3xl font-bold text-gray-900">X-Store</h1>
+          </div>
+          <h2 className="text-2xl font-semibold text-gray-900">
+            Create your account
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Join X-Store and start shopping today
           </p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-x-3">
-            <GoogleButton />
-            <FacebookButton />
-          </div>
-
-          <div className="flex text-gray-400 justify-center items-center my-5 text-sm">
-            <Separator className="flex-1" />
-            <span className="px-3">or continue with Email</span>
-            <Separator className="flex-1" />
-          </div>
-
-          {!isShowOtp ? (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="flex flex-col gap-2">
-                <Label>Name</Label>
+        <div className="bg-white py-8 px-6 shadow-sm rounded-lg">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Name Field */}
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   {...register('name', {
                     required: 'Name is required',
@@ -145,16 +128,20 @@ export default function RegisterPage() {
                       message: 'Name must be at least 3 characters',
                     },
                   })}
-                  placeholder="John Doe"
-                  type="text"
+                  className="pl-10"
+                  placeholder="Enter your full name"
                 />
-                {errors.name && (
-                  <p className="text-red-500 text-xs">{errors.name.message}</p>
-                )}
               </div>
+              {errors.name?.message && (
+                <p className="text-red-500 text-xs">{errors.name.message}</p>
+              )}
+            </div>
 
-              <div className="flex flex-col gap-2">
-                <Label>Email</Label>
+            {/* Email Field */}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   {...register('email', {
                     required: 'Email is required',
@@ -163,122 +150,252 @@ export default function RegisterPage() {
                       message: 'Invalid email address',
                     },
                   })}
-                  placeholder="support@gmail.com"
-                  type="email"
+                  className="pl-10"
+                  placeholder="Enter your email"
                 />
-                {errors.email && (
-                  <p className="text-red-500 text-xs">{errors.email.message}</p>
-                )}
               </div>
-
-              <div className="flex flex-col gap-2">
-                <Label>Password</Label>
-                <div className="relative">
-                  <Input
-                    {...register('password', {
-                      required: 'Password is required',
-                      minLength: {
-                        value: 8,
-                        message: 'Password must be at least 8 characters',
-                      },
-                    })}
-                    placeholder="Min. 8 characters"
-                    type={isPasswordVisible ? 'text' : 'password'}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 text-gray-400"
-                    onClick={() => setIsPasswordVisible((prev) => !prev)}
-                  >
-                    {isPasswordVisible ? (
-                      <RiEye2Line size={22} />
-                    ) : (
-                      <RiEyeCloseLine size={22} />
-                    )}
-                  </button>
-                </div>
-                {errors.password && (
-                  <p className="text-red-500 text-xs">
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
-
-              <Button
-                disabled={signUpMutation.isPending}
-                type="submit"
-                size="lg"
-                className={cn(
-                  'w-full',
-                  signUpMutation.isPending &&
-                    'pointer-events-none cursor-not-allowed opacity-50'
-                )}
-              >
-                {signUpMutation.isPending ? (
-                  <FiLoader className="animate-spin" />
-                ) : (
-                  'Register'
-                )}
-              </Button>
-            </form>
-          ) : (
-            <div className="flex flex-col gap-y-4">
-              <h3 className="text-xl font-semibold text-center mb-4">
-                Enter OTP
-              </h3>
-
-              <div className="flex justify-center">
-                <InputOTP onChange={(val) => setOtp(val)} maxLength={6}>
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} className="h-12 w-12 text-2xl" />
-                    <InputOTPSlot index={1} className="h-12 w-12 text-2xl" />
-                    <InputOTPSlot index={2} className="h-12 w-12 text-2xl" />
-                  </InputOTPGroup>
-                  <InputOTPSeparator />
-                  <InputOTPGroup>
-                    <InputOTPSlot index={3} className="h-12 w-12 text-2xl" />
-                    <InputOTPSlot index={4} className="h-12 w-12 text-2xl" />
-                    <InputOTPSlot index={5} className="h-12 w-12 text-2xl" />
-                  </InputOTPGroup>
-                </InputOTP>
-              </div>
-
-              <Button
-                type="button"
-                onClick={() => verifyOtpMutation.mutate()}
-                size="lg"
-                className="h-12 bg-lime-600"
-                disabled={
-                  !otp || otp.length !== 6 || verifyOtpMutation.isPending
-                }
-              >
-                {verifyOtpMutation.isPending ? (
-                  <FiLoader className="animate-spin" />
-                ) : (
-                  'Verify OTP'
-                )}
-              </Button>
-
-              <p className="text-center text-sm mt-4">
-                {canResend ? (
-                  <button
-                    className="text-lime-600 cursor-pointer"
-                    onClick={resendOtp}
-                  >
-                    Resend OTP
-                  </button>
-                ) : (
-                  `Resend OTP in ${timer}s`
-                )}
-              </p>
-              {verifyOtpMutation.isError &&
-                verifyOtpMutation.error instanceof AxiosError && (
-                  <p className="text-red-500 text-xs mt-2">
-                    {verifyOtpMutation.error.response?.data.message}
-                  </p>
-                )}
+              {errors.email?.message && (
+                <p className="text-red-500 text-xs">{errors.email.message}</p>
+              )}
             </div>
-          )}
+
+            {/* Password Field */}
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  {...register('password', {
+                    required: 'Password is required',
+                    minLength: {
+                      value: 8,
+                      message: 'Password must be at least 8 characters',
+                    },
+                  })}
+                  type={isPasswordVisible ? 'text' : 'password'}
+                  className="pl-10 pr-12"
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordVisible((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                >
+                  {isPasswordVisible ? (
+                    <Eye size={18} />
+                  ) : (
+                    <EyeClosed size={18} />
+                  )}
+                </button>
+              </div>
+              {errors.password?.message && (
+                <p className="text-red-500 text-xs">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-lime-600 hover:bg-lime-700"
+              disabled={signUpMutation.isPending}
+            >
+              <span className="flex items-center justify-center">
+                {signUpMutation.isPending && (
+                  <FaSpinner className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Sign Up
+              </span>
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link
+                href="/login"
+                className="font-medium text-lime-600 hover:text-lime-500"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// OTP Component
+function OtpVerification({
+  email,
+  onBack,
+  onSubmit,
+  onResendOtp,
+  onVerifyOtp,
+}: {
+  email: string;
+  onBack: () => void;
+  onSubmit: () => void;
+  onResendOtp: () => void;
+  onVerifyOtp: (otp: string) => void;
+}) {
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+
+  useEffect(() => {
+    if (timer === 0) {
+      setCanResend(true);
+      return;
+    }
+
+    setCanResend(false);
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timer]);
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+    onVerifyOtp(newOtp.join(''));
+
+    if (value && index < otp.length - 1) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('Text').trim();
+
+    if (!/^\d{6}$/.test(pasteData)) return;
+    const newOtp = pasteData.split('');
+    setOtp(newOtp);
+    onVerifyOtp(newOtp.join(''));
+
+    const lastInput = document.getElementById(`otp-5`);
+    lastInput?.focus();
+  };
+
+  const handleResendOtp = () => {
+    if (!canResend) return;
+    onResendOtp();
+    setTimer(60);
+    setCanResend(false);
+    setOtp(['', '', '', '', '', '']);
+    onVerifyOtp('');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.some((digit) => !digit)) {
+      toast.error('Please enter all 6 digits');
+      return;
+    }
+    onSubmit();
+  };
+
+  const formatTime = (seconds: number) =>
+    `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(
+      seconds % 60
+    ).padStart(2, '0')}`;
+
+  return (
+    <div className="min-h-[84vh] flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <div className="flex justify-center items-center mb-6">
+            <ShoppingBag className="h-12 w-12 text-blue-600" />
+            <h1 className="ml-3 text-3xl font-bold text-gray-900">X-Store</h1>
+          </div>
+          <h2 className="text-2xl font-semibold">Verify your email</h2>
+          <p className="text-sm text-gray-600">We sent a 6-digit code to</p>
+          <p className="text-sm font-medium">{email}</p>
+        </div>
+
+        <div className="bg-white py-8 px-6 shadow-lg rounded-lg">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Label>Enter verification code</Label>
+              <div className="flex justify-center space-x-3 mt-2">
+                {otp.map((digit, index) => (
+                  <Input
+                    key={index}
+                    id={`otp-${index}`}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    className="w-12 h-12 text-center text-lg font-semibold"
+                    value={digit}
+                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(index, e)}
+                    onPaste={handlePaste}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-lime-600 hover:bg-lime-700"
+              disabled={otp.some((digit) => !digit)}
+            >
+              Verify Email
+            </Button>
+          </form>
+
+          <div className="mt-6 space-y-4 text-center">
+            {timer > 0 ? (
+              <p className="text-sm text-gray-600">
+                Resend code in{' '}
+                <span className="font-mono font-semibold text-blue-600">
+                  {formatTime(timer)}
+                </span>
+              </p>
+            ) : (
+              <button
+                onClick={handleResendOtp}
+                className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                disabled={!canResend}
+              >
+                Resend OTP
+              </button>
+            )}
+
+            <div>
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back to registration
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
